@@ -9,9 +9,18 @@ import SwiftUI
 
 @main
 struct whatEatApp: App {
+    @State private var authManager = AuthenticationManager()
+    
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            Group {
+                if authManager.isAuthenticated {
+                    ContentView()
+                } else {
+                    LoginView()
+                }
+            }
+            .environment(authManager)
         }
     }
 }
