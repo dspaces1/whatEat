@@ -32,13 +32,6 @@ struct RecipeCardView: View {
 }
 
 #Preview {
-    RecipeCardView(recipe: Recipe(
-        id: UUID(),
-        name: "Potato & Herb Hash",
-        mealType: .breakfast,
-        prepTime: "25 min",
-        calories: 320,
-        imageName: "potato_hash"
-    ))
-    .padding()
+    RecipeCardView(recipe: MockRecipeData.recipes[0])
+        .padding()
 }

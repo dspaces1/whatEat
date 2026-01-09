@@ -28,6 +28,39 @@ enum MealType: String, CaseIterable, Identifiable {
     }
 }
 
+struct Ingredient: Identifiable {
+    let id: UUID
+    let name: String
+    let amount: String?
+    
+    init(id: UUID = UUID(), name: String, amount: String? = nil) {
+        self.id = id
+        self.name = name
+        self.amount = amount
+    }
+    
+    var displayText: String {
+        if let amount = amount {
+            return "\(amount) \(name)"
+        }
+        return name
+    }
+}
+
+struct InstructionStep: Identifiable {
+    let id: UUID
+    let stepNumber: Int
+    let title: String
+    let description: String
+    
+    init(id: UUID = UUID(), stepNumber: Int, title: String, description: String) {
+        self.id = id
+        self.stepNumber = stepNumber
+        self.title = title
+        self.description = description
+    }
+}
+
 struct Recipe: Identifiable {
     let id: UUID
     let name: String
@@ -35,6 +68,8 @@ struct Recipe: Identifiable {
     let prepTime: String
     let calories: Int
     let imageName: String
+    let ingredients: [Ingredient]
+    let instructions: [InstructionStep]
     
     var caloriesDisplay: String {
         "\(calories) kcal"

@@ -7,37 +7,40 @@ struct HomeView: View {
     private let coralColor = Color(red: 0.96, green: 0.58, blue: 0.53)
     
     var body: some View {
-        VStack(spacing: 0) {
-            // Header
-            headerView
-            
-            // Divider gradient line
-            LinearGradient(
-                colors: [
-                    coralColor.opacity(0.8),
-                    coralColor.opacity(0.4),
-                    coralColor.opacity(0.1)
-                ],
-                startPoint: .leading,
-                endPoint: .trailing
-            )
-            .frame(height: 2)
-            .padding(.horizontal, 16)
-            
-            // Content
-            ScrollView {
-                VStack(spacing: 0) {
-                    ForEach(MealType.allCases) { mealType in
-                        mealSection(for: mealType)
+        NavigationStack {
+            VStack(spacing: 0) {
+                // Header
+                headerView
+                
+                // Divider gradient line
+                LinearGradient(
+                    colors: [
+                        coralColor.opacity(0.8),
+                        coralColor.opacity(0.4),
+                        coralColor.opacity(0.1)
+                    ],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+                .frame(height: 2)
+                .padding(.horizontal, 16)
+                
+                // Content
+                ScrollView {
+                    VStack(spacing: 0) {
+                        ForEach(MealType.allCases) { mealType in
+                            mealSection(for: mealType)
+                        }
                     }
+                    .padding(.bottom, 100) // Space for tab bar
                 }
-                .padding(.bottom, 100) // Space for tab bar
             }
-        }
-        .background(Color(.systemBackground))
-        .sheet(isPresented: $showProfile) {
-            ProfileView()
-                .environment(authManager)
+            .background(Color(.systemBackground))
+            .navigationBarHidden(true)
+            .sheet(isPresented: $showProfile) {
+                ProfileView()
+                    .environment(authManager)
+            }
         }
     }
     
@@ -111,8 +114,11 @@ struct HomeView: View {
                 VStack(spacing: 0) {
                     ForEach(recipes) { recipe in
                         VStack(spacing: 0) {
-                            RecipeCardView(recipe: recipe)
-                                .padding(.horizontal, 20)
+                            NavigationLink(destination: RecipeDetailView(recipe: recipe)) {
+                                RecipeCardView(recipe: recipe)
+                                    .padding(.horizontal, 20)
+                            }
+                            .buttonStyle(.plain)
                             
                             // Divider after each card
                             Divider()
