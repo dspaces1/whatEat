@@ -10,6 +10,12 @@ import AuthenticationServices
 import SwiftUI
 import Observation
 
+enum AuthState {
+    case checking
+    case authenticated
+    case signedOut
+}
+
 /// Manages Sign in with Apple authentication flow following Apple's best practices.
 @Observable
 @MainActor
@@ -17,7 +23,7 @@ final class AuthenticationManager: NSObject {
     
     // MARK: - Published Properties
     
-    var isAuthenticated = false
+    var authState: AuthState = .checking
     var isLoading = false
     var errorMessage: String?
     
@@ -31,6 +37,25 @@ final class AuthenticationManager: NSObject {
     
     private let keychain = KeychainService.shared
     private var currentWindow: UIWindow?
+    
+    // MARK: - Helpers
+    
+    private func transitionToAuthenticated() {
+        authState = .authenticated
+        userDisplayName = keychain.getUserFullName()
+        userEmail = keychain.getUserEmail()
+    }
+    
+    private func transitionToSignedOut(clearAppleIdentity: Bool) {
+        if clearAppleIdentity {
+            keychain.clearAllCredentials()
+        } else {
+            keychain.clearTokens()
+        }
+        userDisplayName = nil
+        userEmail = nil
+        authState = .signedOut
+    }
     
     // MARK: - Initialization
     
@@ -70,10 +95,7 @@ final class AuthenticationManager: NSObject {
         let accessToken = keychain.getAccessToken()
         
         // Clear local state immediately
-        keychain.clearAllCredentials()
-        isAuthenticated = false
-        userDisplayName = nil
-        userEmail = nil
+        transitionToSignedOut(clearAppleIdentity: true)
         
         // Best-effort backend sign out (don't block on this)
         if let token = accessToken {
@@ -100,7 +122,7 @@ final class AuthenticationManager: NSObject {
     /// Checks if the user has existing valid credentials
     func checkExistingCredentials() async {
         guard let userIdentifier = keychain.getUserIdentifier() else {
-            isAuthenticated = false
+            transitionToSignedOut(clearAppleIdentity: false)
             return
         }
         
@@ -117,39 +139,43 @@ final class AuthenticationManager: NSObject {
                     // We have backend tokens - try to ensure they're valid
                     do {
                         _ = try await getValidAccessToken()
-                        isAuthenticated = true
-                        userDisplayName = keychain.getUserFullName()
-                        userEmail = keychain.getUserEmail()
+                        transitionToAuthenticated()
+                    } catch let authError as AuthError {
+                        // Only blow away credentials for real session-expiry scenarios
+                        switch authError {
+                        case .sessionExpired, .notLoggedIn:
+                            print("[Auth] Backend tokens expired: \(authError)")
+                            transitionToSignedOut(clearAppleIdentity: false)
+                        default:
+                            print("[Auth] Auth error validating tokens: \(authError)")
+                            transitionToSignedOut(clearAppleIdentity: false)
+                        }
                     } catch {
-                        // Backend tokens invalid - need to re-authenticate
-                        print("[Auth] Backend tokens invalid: \(error)")
-                        keychain.clearAllCredentials()
-                        isAuthenticated = false
+                        // Network/server issues shouldn't force the user to re-authenticate
+                        print("[Auth] Temporary token validation error: \(error)")
+                        transitionToAuthenticated()
                     }
                 } else {
                     // No backend tokens - need to re-authenticate
                     print("[Auth] No backend tokens found")
-                    keychain.clearAllCredentials()
-                    isAuthenticated = false
+                    transitionToSignedOut(clearAppleIdentity: false)
                 }
                 
             case .revoked, .notFound:
                 // Credentials are no longer valid
-                keychain.clearAllCredentials()
-                isAuthenticated = false
+                transitionToSignedOut(clearAppleIdentity: true)
                 
             case .transferred:
                 // Handle account transfer (rare case for enterprise)
-                keychain.clearAllCredentials()
-                isAuthenticated = false
+                transitionToSignedOut(clearAppleIdentity: true)
                 
             @unknown default:
-                isAuthenticated = false
+                transitionToSignedOut(clearAppleIdentity: true)
             }
         } catch {
             // If we can't verify, treat as not authenticated
             print("[Auth] Error checking credential state: \(error)")
-            isAuthenticated = false
+            transitionToSignedOut(clearAppleIdentity: false)
         }
     }
     
@@ -204,10 +230,7 @@ final class AuthenticationManager: NSObject {
             if case .unauthorized = error {
                 // Refresh token expired - user must sign in again
                 print("[Auth] ❌ Refresh token expired - session ended")
-                await MainActor.run {
-                    keychain.clearAllCredentials()
-                    isAuthenticated = false
-                }
+                transitionToSignedOut(clearAppleIdentity: false)
                 throw AuthError.sessionExpired
             }
             throw error
@@ -294,7 +317,7 @@ final class AuthenticationManager: NSObject {
             )
             
             print("[Auth] ✅ Signed in as user: \(response.user.id)")
-            isAuthenticated = true
+            transitionToAuthenticated()
             isLoading = false
             
         } catch let error as APIError {
@@ -302,13 +325,13 @@ final class AuthenticationManager: NSObject {
             isLoading = false
             errorMessage = error.localizedDescription
             // Clear local credentials since backend auth failed
-            keychain.clearAllCredentials()
+            transitionToSignedOut(clearAppleIdentity: false)
             
         } catch {
             print("[Auth] ❌ Backend auth failed: \(error)")
             isLoading = false
             errorMessage = "Sign in failed. Please try again."
-            keychain.clearAllCredentials()
+            transitionToSignedOut(clearAppleIdentity: false)
         }
     }
     

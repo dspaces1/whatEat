@@ -14,13 +14,27 @@ struct whatEatApp: App {
     var body: some Scene {
         WindowGroup {
             Group {
-                if authManager.isAuthenticated {
+                switch authManager.authState {
+                case .checking:
+                    SplashStateView()
+                case .authenticated:
                     ContentView()
-                } else {
+                case .signedOut:
                     LoginView()
                 }
             }
+            .animation(.easeInOut, value: authManager.authState)
             .environment(authManager)
+        }
+    }
+}
+
+private struct SplashStateView: View {
+    var body: some View {
+        ZStack {
+            Color(.systemBackground).ignoresSafeArea()
+            ProgressView("Checking your session…")
+                .progressViewStyle(.circular)
         }
     }
 }
