@@ -5,15 +5,9 @@ struct RecipeCardView: View {
     
     var body: some View {
         HStack(spacing: 16) {
-            // Thumbnail image placeholder
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color.gray.opacity(0.2))
+            RemoteImageView(url: recipe.imageURL)
                 .frame(width: 80, height: 80)
-                .overlay(
-                    Image(systemName: "photo")
-                        .font(.title2)
-                        .foregroundColor(.gray.opacity(0.5))
-                )
+                .clipShape(RoundedRectangle(cornerRadius: 12))
             
             VStack(alignment: .leading, spacing: 6) {
                 Text(recipe.name)

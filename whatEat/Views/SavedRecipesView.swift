@@ -118,14 +118,14 @@ private struct SavedRecipeRow: View {
     
     var body: some View {
         HStack(alignment: .center, spacing: 16) {
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .fill(recipe.mealType.accentColor.opacity(0.15))
-                .frame(width: 70, height: 70)
-                .overlay(
-                    Image(systemName: "photo")
-                        .font(.system(size: 26))
-                        .foregroundColor(recipe.mealType.accentColor.opacity(0.8))
-                )
+            RemoteImageView(
+                url: recipe.imageURL,
+                placeholderBackground: recipe.mealType.accentColor.opacity(0.15),
+                placeholderIconColor: recipe.mealType.accentColor.opacity(0.8),
+                placeholderIconFont: .system(size: 26)
+            )
+            .frame(width: 70, height: 70)
+            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
             
             VStack(alignment: .leading, spacing: 6) {
                 Text(recipe.name)

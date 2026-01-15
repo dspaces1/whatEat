@@ -4,12 +4,12 @@ struct MockRecipeData {
     static let recipes: [Recipe] = [
         // Breakfast (1 item)
         Recipe(
-            id: UUID(),
+            id: UUID().uuidString,
             name: "Potato & Herb Hash",
             mealType: .breakfast,
             prepTime: "25 min",
             calories: 320,
-            imageName: "potato_hash",
+            imageURL: nil,
             ingredients: [
                 Ingredient(name: "large potatoes, diced", amount: "2"),
                 Ingredient(name: "tbsp olive oil", amount: "1"),
@@ -28,12 +28,12 @@ struct MockRecipeData {
         
         // Lunch (2 items)
         Recipe(
-            id: UUID(),
+            id: UUID().uuidString,
             name: "Spicy Thai Chicken",
             mealType: .lunch,
             prepTime: "15 min",
             calories: 450,
-            imageName: "thai_chicken",
+            imageURL: nil,
             ingredients: [
                 Ingredient(name: "chicken breast, sliced", amount: "1 lb"),
                 Ingredient(name: "tbsp vegetable oil", amount: "2"),
@@ -51,12 +51,12 @@ struct MockRecipeData {
             ]
         ),
         Recipe(
-            id: UUID(),
+            id: UUID().uuidString,
             name: "Pan-Seared Salmon",
             mealType: .lunch,
             prepTime: "25 min",
             calories: 380,
-            imageName: "salmon",
+            imageURL: nil,
             ingredients: [
                 Ingredient(name: "salmon fillets", amount: "2"),
                 Ingredient(name: "tbsp olive oil", amount: "2"),
@@ -76,12 +76,12 @@ struct MockRecipeData {
         
         // Dinner (2 items)
         Recipe(
-            id: UUID(),
+            id: UUID().uuidString,
             name: "Mushroom Risotto",
             mealType: .dinner,
             prepTime: "40 min",
             calories: 520,
-            imageName: "risotto",
+            imageURL: nil,
             ingredients: [
                 Ingredient(name: "cups arborio rice", amount: "1.5"),
                 Ingredient(name: "cups mixed mushrooms, sliced", amount: "2"),
@@ -100,12 +100,12 @@ struct MockRecipeData {
             ]
         ),
         Recipe(
-            id: UUID(),
+            id: UUID().uuidString,
             name: "Beef Wellington",
             mealType: .dinner,
             prepTime: "1h 10m",
             calories: 680,
-            imageName: "beef_wellington",
+            imageURL: nil,
             ingredients: [
                 Ingredient(name: "lb beef tenderloin", amount: "2"),
                 Ingredient(name: "sheets puff pastry", amount: "2"),
@@ -125,12 +125,12 @@ struct MockRecipeData {
         
         // Dessert (1 item)
         Recipe(
-            id: UUID(),
+            id: UUID().uuidString,
             name: "Choco Lava Cake",
             mealType: .dessert,
             prepTime: "30 min",
             calories: 410,
-            imageName: "lava_cake",
+            imageURL: nil,
             ingredients: [
                 Ingredient(name: "oz dark chocolate", amount: "4"),
                 Ingredient(name: "tbsp butter", amount: "4"),

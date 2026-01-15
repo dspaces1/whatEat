@@ -3,6 +3,7 @@ import SwiftUI
 struct HomeView: View {
     @Environment(AuthenticationManager.self) private var authManager
     @State private var showProfile = false
+    @State private var viewModel = HomeViewModel()
     
     private let coralColor = Color(red: 0.96, green: 0.58, blue: 0.53)
     
@@ -27,12 +28,26 @@ struct HomeView: View {
                 
                 // Content
                 ScrollView {
-                    VStack(spacing: 0) {
-                        ForEach(MealType.allCases) { mealType in
-                            mealSection(for: mealType)
+                    LazyVStack(spacing: 0) {
+                        if viewModel.isLoading && viewModel.isEmpty {
+                            ProgressView()
+                                .padding(.top, 40)
+                        } else if viewModel.hasLoaded && viewModel.isEmpty {
+                            emptyStateView
+                        } else {
+                            let mealTypes = MealType.allCases.filter { mealType in
+                                mealType != .other || !viewModel.suggestions(for: .other).isEmpty
+                            }
+
+                            ForEach(mealTypes) { mealType in
+                                mealSection(for: mealType, suggestions: viewModel.suggestions(for: mealType))
+                            }
                         }
                     }
                     .padding(.bottom, 100) // Space for tab bar
+                }
+                .refreshable {
+                    await viewModel.refreshSuggestions(authManager: authManager)
                 }
             }
             .background(Color(.systemBackground))
@@ -40,6 +55,9 @@ struct HomeView: View {
             .sheet(isPresented: $showProfile) {
                 ProfileView()
                     .environment(authManager)
+            }
+            .task {
+                await viewModel.loadDailySuggestions(authManager: authManager)
             }
         }
     }
@@ -60,7 +78,7 @@ struct HomeView: View {
             }
             
             Spacer()
-            
+
             // Profile button
             Button {
                 showProfile = true
@@ -92,34 +110,40 @@ struct HomeView: View {
     // MARK: - Meal Section
     
     @ViewBuilder
-    private func mealSection(for mealType: MealType) -> some View {
-        let recipes = MockRecipeData.recipes(for: mealType)
-        
-        if !recipes.isEmpty {
-            VStack(alignment: .leading, spacing: 12) {
-                // Section header with colored indicator
-                HStack(spacing: 8) {
-                    RoundedRectangle(cornerRadius: 2)
-                        .fill(mealType.accentColor)
-                        .frame(width: 4, height: 20)
-                    
-                    Text(mealType.displayName)
-                        .font(.system(size: 18, weight: .semibold))
-                        .foregroundColor(.primary)
-                }
-                .padding(.top, 24)
-                .padding(.horizontal, 20)
-                
+    private func mealSection(
+        for mealType: MealType,
+        suggestions: [HomeViewModel.HomeSuggestion]
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            // Section header with colored indicator
+            HStack(spacing: 8) {
+                RoundedRectangle(cornerRadius: 2)
+                    .fill(mealType.accentColor)
+                    .frame(width: 4, height: 20)
+
+                Text(mealType.displayName)
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundColor(.primary)
+            }
+            .padding(.top, 24)
+            .padding(.horizontal, 20)
+
+            if suggestions.isEmpty {
+                Text("No recipes available right now.")
+                    .font(.system(size: 14))
+                    .foregroundColor(.secondary)
+                    .padding(.horizontal, 20)
+            } else {
                 // Recipe cards
-                VStack(spacing: 0) {
-                    ForEach(recipes) { recipe in
+                LazyVStack(spacing: 0) {
+                    ForEach(suggestions) { suggestion in
                         VStack(spacing: 0) {
-                            NavigationLink(destination: RecipeDetailView(recipe: recipe)) {
-                                RecipeCardView(recipe: recipe)
+                            NavigationLink(destination: RecipeDetailView(recipe: suggestion.recipe)) {
+                                RecipeCardView(recipe: suggestion.recipe)
                                     .padding(.horizontal, 20)
                             }
                             .buttonStyle(.plain)
-                            
+
                             // Divider after each card
                             Divider()
                                 .padding(.horizontal, 20)
@@ -129,6 +153,21 @@ struct HomeView: View {
                 }
             }
         }
+    }
+
+    private var emptyStateView: some View {
+        VStack(spacing: 16) {
+            Text("No recipes yet")
+                .font(.system(size: 20, weight: .semibold))
+                .foregroundColor(.primary)
+
+            Text("Check back later or refresh for a fresh set of ideas.")
+                .font(.system(size: 15))
+                .foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
+        }
+        .padding(.top, 40)
+        .padding(.horizontal, 24)
     }
 }
 

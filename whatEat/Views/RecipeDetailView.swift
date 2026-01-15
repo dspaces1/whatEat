@@ -51,23 +51,26 @@ struct RecipeDetailView: View {
     // MARK: - Hero Image
     
     private var heroImage: some View {
-        Rectangle()
-            .fill(
-                LinearGradient(
-                    colors: [
-                        recipe.mealType.accentColor.opacity(0.3),
-                        recipe.mealType.accentColor.opacity(0.15)
-                    ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
+        ZStack {
+            RemoteImageView(
+                url: recipe.imageURL,
+                contentMode: .fill,
+                showsPlaceholderIcon: true,
+                placeholderBackground: recipe.mealType.accentColor.opacity(0.2),
+                placeholderIconFont: .system(size: 48)
             )
             .frame(height: 280)
-            .overlay(
-                Image(systemName: "photo")
-                    .font(.system(size: 48))
-                    .foregroundColor(recipe.mealType.accentColor.opacity(0.4))
+            .clipped()
+
+            LinearGradient(
+                colors: [
+                    Color.black.opacity(0.05),
+                    Color.black.opacity(0.15)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
             )
+        }
     }
     
     // MARK: - Stats Card
@@ -153,9 +156,15 @@ struct RecipeDetailView: View {
             }
             
             // Ingredient list
-            VStack(spacing: 14) {
-                ForEach(recipe.ingredients) { ingredient in
-                    ingredientRow(ingredient)
+            if recipe.ingredients.isEmpty {
+                Text("Ingredients will appear here once available.")
+                    .font(.system(size: 15))
+                    .foregroundColor(.secondary)
+            } else {
+                VStack(spacing: 14) {
+                    ForEach(recipe.ingredients) { ingredient in
+                        ingredientRow(ingredient)
+                    }
                 }
             }
         }
@@ -213,9 +222,15 @@ struct RecipeDetailView: View {
             }
             
             // Steps
-            VStack(spacing: 24) {
-                ForEach(recipe.instructions) { step in
-                    instructionRow(step)
+            if recipe.instructions.isEmpty {
+                Text("Instructions will appear here once available.")
+                    .font(.system(size: 15))
+                    .foregroundColor(.secondary)
+            } else {
+                VStack(spacing: 24) {
+                    ForEach(recipe.instructions) { step in
+                        instructionRow(step)
+                    }
                 }
             }
         }

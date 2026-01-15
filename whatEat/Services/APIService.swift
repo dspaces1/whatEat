@@ -18,6 +18,7 @@ actor APIService {
     
     private let decoder: JSONDecoder = {
         let decoder = JSONDecoder()
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
         return decoder
     }()
     
@@ -36,7 +37,7 @@ actor APIService {
     ///   - body: Encodable request body
     /// - Returns: Decoded response of type T
     func post<T: Decodable, U: Encodable>(path: String, body: U) async throws -> T {
-        guard let url = URL(string: "\(baseURL)\(path)") else {
+        guard let url = makeURL(path: path) else {
             throw APIError.invalidURL
         }
         
@@ -59,7 +60,7 @@ actor APIService {
         body: U,
         accessToken: String
     ) async throws -> T {
-        guard let url = URL(string: "\(baseURL)\(path)") else {
+        guard let url = makeURL(path: path) else {
             throw APIError.invalidURL
         }
         
@@ -81,7 +82,7 @@ actor APIService {
         path: String,
         accessToken: String
     ) async throws -> T {
-        guard let url = URL(string: "\(baseURL)\(path)") else {
+        guard let url = makeURL(path: path) else {
             throw APIError.invalidURL
         }
         
@@ -91,6 +92,40 @@ actor APIService {
         request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
         request.httpBody = "{}".data(using: .utf8)
         
+        return try await performRequest(request)
+    }
+
+    /// Performs a GET request and returns decoded response.
+    func get<T: Decodable>(
+        path: String,
+        queryItems: [URLQueryItem] = []
+    ) async throws -> T {
+        guard let url = makeURL(path: path, queryItems: queryItems) else {
+            throw APIError.invalidURL
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        return try await performRequest(request)
+    }
+
+    /// Performs a GET request with authorization header.
+    func getAuthenticated<T: Decodable>(
+        path: String,
+        queryItems: [URLQueryItem] = [],
+        accessToken: String
+    ) async throws -> T {
+        guard let url = makeURL(path: path, queryItems: queryItems) else {
+            throw APIError.invalidURL
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+
         return try await performRequest(request)
     }
     
@@ -105,6 +140,10 @@ actor APIService {
         
         // Log for debugging
         print("[API] \(request.httpMethod ?? "?") \(request.url?.path ?? "?") -> \(httpResponse.statusCode)")
+
+        if (400...599).contains(httpResponse.statusCode) {
+            logNetworkFailure(request: request, response: httpResponse, data: data)
+        }
         
         switch httpResponse.statusCode {
         case 200...299:
@@ -130,6 +169,75 @@ actor APIService {
         default:
             throw APIError.httpError(statusCode: httpResponse.statusCode)
         }
+    }
+
+    private func makeURL(path: String, queryItems: [URLQueryItem] = []) -> URL? {
+        var components = URLComponents(string: "\(baseURL)\(path)")
+        if !queryItems.isEmpty {
+            components?.queryItems = queryItems
+        }
+        return components?.url
+    }
+
+    private func logNetworkFailure(
+        request: URLRequest,
+        response: HTTPURLResponse,
+        data: Data
+    ) {
+        var lines: [String] = []
+        lines.append("[API] Request")
+        lines.append("  Method: \(request.httpMethod ?? "N/A")")
+        lines.append("  URL: \(request.url?.absoluteString ?? "N/A")")
+        lines.append("  Headers: \(formatHeaders(request.allHTTPHeaderFields))")
+        lines.append("  Body: \(formatBody(request.httpBody))")
+        lines.append("[API] Response")
+        lines.append("  Status: \(response.statusCode)")
+        lines.append("  Headers: \(formatHeaders(response.allHeaderFields))")
+        lines.append("  Body: \(formatBody(data))")
+        print(lines.joined(separator: "\n"))
+    }
+
+    private func formatHeaders(_ headers: [AnyHashable: Any]?) -> String {
+        guard let headers, !headers.isEmpty else {
+            return "{}"
+        }
+        let pairs = headers
+            .sorted { String(describing: $0.key) < String(describing: $1.key) }
+            .map { key, value in
+                "\(key): \(value)"
+            }
+        return "{ " + pairs.joined(separator: ", ") + " }"
+    }
+
+    private func formatHeaders(_ headers: [String: String]?) -> String {
+        guard let headers, !headers.isEmpty else {
+            return "{}"
+        }
+        let pairs = headers
+            .sorted { $0.key < $1.key }
+            .map { key, value in
+                "\(key): \(value)"
+            }
+        return "{ " + pairs.joined(separator: ", ") + " }"
+    }
+
+    private func formatBody(_ body: Data?) -> String {
+        guard let body, !body.isEmpty else {
+            return "<empty>"
+        }
+
+        if let object = try? JSONSerialization.jsonObject(with: body, options: []),
+           let prettyData = try? JSONSerialization.data(withJSONObject: object, options: [.prettyPrinted]),
+           let prettyString = String(data: prettyData, encoding: .utf8) {
+            return prettyString.replacingOccurrences(of: "\n", with: " ")
+        }
+
+        if let string = String(data: body, encoding: .utf8) {
+            let trimmed = string.trimmingCharacters(in: .whitespacesAndNewlines)
+            return trimmed.isEmpty ? "<empty>" : trimmed
+        }
+
+        return "<\(body.count) bytes>"
     }
 }
 
@@ -169,4 +277,3 @@ struct APIErrorResponse: Decodable, Sendable {
     let error: String
     let code: String?
 }
-
