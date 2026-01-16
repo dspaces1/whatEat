@@ -10,6 +10,7 @@ import SwiftUI
 @main
 struct whatEatApp: App {
     @State private var authManager = AuthenticationManager()
+    @State private var showDebugMenu = false
     
     var body: some Scene {
         WindowGroup {
@@ -25,6 +26,14 @@ struct whatEatApp: App {
             }
             .animation(.easeInOut, value: authManager.authState)
             .environment(authManager)
+#if DEBUG
+            .background(ShakeDetectorView {
+                showDebugMenu = true
+            })
+            .sheet(isPresented: $showDebugMenu) {
+                DebugMenuView()
+            }
+#endif
         }
     }
 }

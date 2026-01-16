@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import Pulse
 
 /// Centralized API service for making network requests to the whatEat backend.
 actor APIService {
@@ -27,7 +28,11 @@ actor APIService {
         return encoder
     }()
     
-    private init() {}
+    private let session: URLSessionProtocol
+
+    private init() {
+        session = NetworkSessionFactory.makeSession()
+    }
     
     // MARK: - Public Methods
     
@@ -132,7 +137,7 @@ actor APIService {
     // MARK: - Private Methods
     
     private func performRequest<T: Decodable>(_ request: URLRequest) async throws -> T {
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await session.data(for: request)
         
         guard let httpResponse = response as? HTTPURLResponse else {
             throw APIError.invalidResponse

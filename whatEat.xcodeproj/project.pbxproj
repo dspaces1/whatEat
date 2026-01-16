@@ -6,6 +6,11 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		10ABE1AC9D7745ED32E1E094 /* Pulse in Frameworks */ = {isa = PBXBuildFile; productRef = E0AE69FB3BB5942F95B41C26 /* Pulse */; };
+		F9029E0A7A3862320609097F /* PulseUI in Frameworks */ = {isa = PBXBuildFile; productRef = A0F3335FE18385393D6CC359 /* PulseUI */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
 		F17477A42F0AD90E00245229 /* whatEat.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = whatEat.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -23,6 +28,8 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				10ABE1AC9D7745ED32E1E094 /* Pulse in Frameworks */,
+				F9029E0A7A3862320609097F /* PulseUI in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -65,6 +72,8 @@
 			);
 			name = whatEat;
 			packageProductDependencies = (
+				E0AE69FB3BB5942F95B41C26 /* Pulse */,
+				A0F3335FE18385393D6CC359 /* PulseUI */,
 			);
 			productName = whatEat;
 			productReference = F17477A42F0AD90E00245229 /* whatEat.app */;
@@ -94,6 +103,9 @@
 			);
 			mainGroup = F174779B2F0AD90E00245229;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				34FEC8D4BF91834BF2BEF77A /* XCRemoteSwiftPackageReference "Pulse" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = F17477A52F0AD90E00245229 /* Products */;
 			projectDirPath = "";
@@ -334,6 +346,30 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		34FEC8D4BF91834BF2BEF77A /* XCRemoteSwiftPackageReference "Pulse" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/kean/Pulse";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 5.1.4;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		A0F3335FE18385393D6CC359 /* PulseUI */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 34FEC8D4BF91834BF2BEF77A /* XCRemoteSwiftPackageReference "Pulse" */;
+			productName = PulseUI;
+		};
+		E0AE69FB3BB5942F95B41C26 /* Pulse */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 34FEC8D4BF91834BF2BEF77A /* XCRemoteSwiftPackageReference "Pulse" */;
+			productName = Pulse;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = F174779C2F0AD90E00245229 /* Project object */;
 }
