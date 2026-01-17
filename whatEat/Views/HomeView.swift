@@ -138,7 +138,7 @@ struct HomeView: View {
                 LazyVStack(spacing: 0) {
                     ForEach(suggestions) { suggestion in
                         VStack(spacing: 0) {
-                            NavigationLink(destination: RecipeDetailView(recipe: suggestion.recipe)) {
+                            NavigationLink(destination: RecipeDetailView(recipe: suggestion.recipe, showsEditButton: false)) {
                                 RecipeCardView(recipe: suggestion.recipe)
                                     .padding(.horizontal, 20)
                             }

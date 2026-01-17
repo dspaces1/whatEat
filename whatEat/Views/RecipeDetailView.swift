@@ -6,6 +6,7 @@ struct RecipeDetailView: View {
     @Environment(\.dismiss) private var dismiss
 
     let recipe: Recipe
+    let showsEditButton: Bool
     
     @State private var showUnsaveConfirmation = false
     @State private var isBookmarkBusy = false
@@ -25,7 +26,8 @@ struct RecipeDetailView: View {
                 .padding(.bottom, 40)
                 
                 // Content
-                VStack(alignment: .leading, spacing: 28) {
+                VStack(alignment: .leading, spacing: 24) {
+                    recipeTitle
                     ingredientsSection
                     instructionsSection
                 }
@@ -39,28 +41,40 @@ struct RecipeDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                Button {
-                    guard !isBookmarkBusy else { return }
-                    if isBookmarked {
-                        showUnsaveConfirmation = true
-                    } else {
-                        Task {
-                            await handleSave()
+                HStack(spacing: 16) {
+                    if showsEditButton {
+                        Button {
+                            // TODO: Hook up edit flow.
+                        } label: {
+                            Image(systemName: "pencil")
+                                .font(.system(size: 18, weight: .semibold))
+                                .foregroundColor(.primary)
                         }
                     }
-                } label: {
-                    ZStack {
-                        if isBookmarkBusy {
-                            ProgressView()
-                                .tint(coralColor)
+
+                    Button {
+                        guard !isBookmarkBusy else { return }
+                        if isBookmarked {
+                            showUnsaveConfirmation = true
                         } else {
-                            Image(systemName: isBookmarked ? "bookmark.fill" : "bookmark")
-                                .font(.system(size: 16, weight: .medium))
-                                .foregroundColor(isBookmarked ? coralColor : .primary)
+                            Task {
+                                await handleSave()
+                            }
+                        }
+                    } label: {
+                        ZStack {
+                            if isBookmarkBusy {
+                                ProgressView()
+                                    .tint(coralColor)
+                            } else {
+                                Image(systemName: isBookmarked ? "bookmark.fill" : "bookmark")
+                                    .font(.system(size: 16, weight: .medium))
+                                    .foregroundColor(isBookmarked ? coralColor : .primary)
+                            }
                         }
                     }
+                    .disabled(isBookmarkBusy)
                 }
-                .disabled(isBookmarkBusy)
             }
         }
         .alert("Remove bookmark?", isPresented: $showUnsaveConfirmation) {
@@ -151,6 +165,16 @@ struct RecipeDetailView: View {
                 .shadow(color: .black.opacity(0.08), radius: 20, x: 0, y: 4)
         )
         .padding(.horizontal, 40)
+    }
+
+    // MARK: - Title
+
+    private var recipeTitle: some View {
+        Text(recipe.name)
+            .font(.system(size: 24, weight: .bold))
+            .foregroundColor(.primary)
+            .lineLimit(3)
+            .truncationMode(.tail)
     }
     
     // MARK: - Ingredients Section
@@ -321,7 +345,7 @@ struct RecipeDetailView: View {
 
 #Preview {
     NavigationStack {
-        RecipeDetailView(recipe: MockRecipeData.recipes[0])
+        RecipeDetailView(recipe: MockRecipeData.recipes[0], showsEditButton: false)
     }
     .environment(AuthenticationManager())
     .environment(SavedRecipesStore.preview())

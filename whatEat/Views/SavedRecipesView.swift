@@ -83,58 +83,8 @@ struct SavedRecipesView: View {
     
     private var savedListSection: some View {
         VStack(alignment: .leading, spacing: 20) {
-            HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Pantry Essentials")
-                        .font(.system(size: 20, weight: .bold))
-                        .foregroundColor(.black)
-                    Text("\(savedRecipesStore.savedRecipes.count) recipes")
-                        .font(.system(size: 15, weight: .medium))
-                        .foregroundColor(.black.opacity(0.4))
-                }
-                Spacer()
-                Text("Curated")
-                    .font(.system(size: 13, weight: .semibold))
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(coralColor.opacity(0.1))
-                    .foregroundColor(coralColor)
-                    .clipShape(Capsule())
-            }
-            
-            VStack(spacing: 16) {
-                if savedRecipesStore.isLoading && savedRecipesStore.savedRecipes.isEmpty {
-                    ProgressView()
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 24)
-                } else if savedRecipesStore.savedRecipes.isEmpty {
-                    emptyState
-                } else {
-                    LazyVStack(spacing: 16) {
-                        ForEach(savedRecipesStore.savedRecipes) { savedRecipe in
-                            NavigationLink(destination: RecipeDetailView(recipe: savedRecipe.recipe)) {
-                                SavedRecipeRow(recipe: savedRecipe.recipe)
-                            }
-                            .buttonStyle(.plain)
-                            .onAppear {
-                                if savedRecipe.id == savedRecipesStore.savedRecipes.last?.id {
-                                    Task {
-                                        await savedRecipesStore.loadMoreSavedRecipes(authManager: authManager)
-                                    }
-                                }
-                            }
-                        }
-
-                        if savedRecipesStore.isLoadingMore {
-                            ProgressView()
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 16)
-                        }
-                    }
-                }
-
-                AddRecipeUpsellCard()
-            }
+            savedListHeader
+            savedListContent
         }
         .padding(20)
         .frame(maxWidth: .infinity)
@@ -143,6 +93,67 @@ struct SavedRecipesView: View {
                 .fill(Color.white)
                 .shadow(color: Color.black.opacity(0.06), radius: 12, x: 0, y: 6)
         )
+    }
+
+    private var savedListHeader: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Pantry Essentials")
+                    .font(.system(size: 20, weight: .bold))
+                    .foregroundColor(.black)
+                Text("\(savedRecipesStore.savedRecipes.count) recipes")
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundColor(.black.opacity(0.4))
+            }
+            Spacer()
+            Text("Curated")
+                .font(.system(size: 13, weight: .semibold))
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(coralColor.opacity(0.1))
+                .foregroundColor(coralColor)
+                .clipShape(Capsule())
+        }
+    }
+
+    private var savedListContent: some View {
+        VStack(spacing: 16) {
+            savedRecipesContent
+            AddRecipeUpsellCard()
+        }
+    }
+
+    @ViewBuilder
+    private var savedRecipesContent: some View {
+        if savedRecipesStore.isLoading && savedRecipesStore.savedRecipes.isEmpty {
+            ProgressView()
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 24)
+        } else if savedRecipesStore.savedRecipes.isEmpty {
+            emptyState
+        } else {
+            LazyVStack(spacing: 16) {
+                ForEach(savedRecipesStore.savedRecipes) { savedRecipe in
+                    NavigationLink(destination: RecipeDetailView(recipe: savedRecipe.recipe, showsEditButton: true)) {
+                        SavedRecipeRow(recipe: savedRecipe.recipe)
+                    }
+                    .buttonStyle(.plain)
+                    .onAppear {
+                        if savedRecipe.id == savedRecipesStore.savedRecipes.last?.id {
+                            Task {
+                                await savedRecipesStore.loadMoreSavedRecipes(authManager: authManager)
+                            }
+                        }
+                    }
+                }
+
+                if savedRecipesStore.isLoadingMore {
+                    ProgressView()
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 16)
+                }
+            }
+        }
     }
 
     private var emptyState: some View {
