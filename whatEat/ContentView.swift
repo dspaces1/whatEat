@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ContentView: View {
     @Environment(AuthenticationManager.self) private var authManager
+    @Environment(SavedRecipesStore.self) private var savedRecipesStore
     @State private var selectedTab: AppTab = .home
     
     var body: some View {
@@ -16,8 +17,13 @@ struct ContentView: View {
             }
             
             Tab("Saved", systemImage: "heart.fill", value: .saved) {
-                SavedRecipesView(savedRecipes: MockRecipeData.recipes)
+                NavigationStack {
+                    SavedRecipesView()
+                }
             }
+        }
+        .task {
+            await savedRecipesStore.loadSavedRecipesIfNeeded(authManager: authManager)
         }
     }
 }
@@ -31,4 +37,5 @@ enum AppTab: Hashable {
 #Preview {
     ContentView()
         .environment(AuthenticationManager())
+        .environment(SavedRecipesStore.preview())
 }

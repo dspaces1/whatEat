@@ -133,6 +133,23 @@ actor APIService {
 
         return try await performRequest(request)
     }
+
+    /// Performs a DELETE request with authorization header.
+    func deleteAuthenticated(
+        path: String,
+        accessToken: String
+    ) async throws {
+        guard let url = makeURL(path: path) else {
+            throw APIError.invalidURL
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "DELETE"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+
+        try await performVoidRequest(request)
+    }
     
     // MARK: - Private Methods
     
@@ -156,6 +173,7 @@ actor APIService {
                 return try decoder.decode(T.self, from: data)
             } catch {
                 print("[API] Decode error: \(error)")
+                logNetworkFailure(request: request, response: httpResponse, data: data)
                 throw APIError.decodingError(error)
             }
             
@@ -171,6 +189,36 @@ actor APIService {
             let errorResponse = try? decoder.decode(APIErrorResponse.self, from: data)
             throw APIError.serverError(errorResponse?.error ?? "Server error")
             
+        default:
+            throw APIError.httpError(statusCode: httpResponse.statusCode)
+        }
+    }
+
+    private func performVoidRequest(_ request: URLRequest) async throws {
+        let (data, response) = try await session.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw APIError.invalidResponse
+        }
+
+        print("[API] \(request.httpMethod ?? "?") \(request.url?.path ?? "?") -> \(httpResponse.statusCode)")
+
+        if (400...599).contains(httpResponse.statusCode) {
+            logNetworkFailure(request: request, response: httpResponse, data: data)
+        }
+
+        switch httpResponse.statusCode {
+        case 200...299:
+            return
+        case 400:
+            let errorResponse = try? decoder.decode(APIErrorResponse.self, from: data)
+            throw APIError.badRequest(errorResponse?.error ?? "Bad request")
+        case 401:
+            let errorResponse = try? decoder.decode(APIErrorResponse.self, from: data)
+            throw APIError.unauthorized(errorResponse?.error ?? "Unauthorized")
+        case 500...599:
+            let errorResponse = try? decoder.decode(APIErrorResponse.self, from: data)
+            throw APIError.serverError(errorResponse?.error ?? "Server error")
         default:
             throw APIError.httpError(statusCode: httpResponse.statusCode)
         }

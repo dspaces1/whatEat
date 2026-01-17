@@ -1,10 +1,14 @@
 import SwiftUI
 
 struct RecipeDetailView: View {
+    @Environment(AuthenticationManager.self) private var authManager
+    @Environment(SavedRecipesStore.self) private var savedRecipesStore
+    @Environment(\.dismiss) private var dismiss
+
     let recipe: Recipe
     
-    @State private var checkedIngredients: Set<UUID> = []
-    @State private var isBookmarked: Bool = false
+    @State private var showUnsaveConfirmation = false
+    @State private var isBookmarkBusy = false
     
     private let coralColor = Color(red: 0.96, green: 0.58, blue: 0.53)
     private let softGreen = Color(red: 0.56, green: 0.82, blue: 0.67)
@@ -36,15 +40,38 @@ struct RecipeDetailView: View {
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
-                        isBookmarked.toggle()
+                    guard !isBookmarkBusy else { return }
+                    if isBookmarked {
+                        showUnsaveConfirmation = true
+                    } else {
+                        Task {
+                            await handleSave()
+                        }
                     }
                 } label: {
-                    Image(systemName: isBookmarked ? "bookmark.fill" : "bookmark")
-                        .font(.system(size: 16, weight: .medium))
-                        .foregroundColor(isBookmarked ? coralColor : .primary)
+                    ZStack {
+                        if isBookmarkBusy {
+                            ProgressView()
+                                .tint(coralColor)
+                        } else {
+                            Image(systemName: isBookmarked ? "bookmark.fill" : "bookmark")
+                                .font(.system(size: 16, weight: .medium))
+                                .foregroundColor(isBookmarked ? coralColor : .primary)
+                        }
+                    }
+                }
+                .disabled(isBookmarkBusy)
+            }
+        }
+        .alert("Remove bookmark?", isPresented: $showUnsaveConfirmation) {
+            Button("Remove", role: .destructive) {
+                Task {
+                    await handleUnsaveAndDismiss()
                 }
             }
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("Are you sure you want to remove this recipe from saved?")
         }
     }
     
@@ -146,7 +173,7 @@ struct RecipeDetailView: View {
                 
                 Button {
                     withAnimation(.easeInOut(duration: 0.2)) {
-                        checkedIngredients.removeAll()
+                        savedRecipesStore.resetIngredientChecks(recipeId: recipe.id)
                     }
                 } label: {
                     Text("Reset")
@@ -173,21 +200,20 @@ struct RecipeDetailView: View {
     private func ingredientRow(_ ingredient: Ingredient) -> some View {
         Button {
             withAnimation(.easeInOut(duration: 0.15)) {
-                if checkedIngredients.contains(ingredient.id) {
-                    checkedIngredients.remove(ingredient.id)
-                } else {
-                    checkedIngredients.insert(ingredient.id)
-                }
+                savedRecipesStore.toggleIngredientCheck(
+                    recipeId: recipe.id,
+                    key: ingredient.cacheKey
+                )
             }
         } label: {
             HStack(spacing: 14) {
                 // Checkbox
                 RoundedRectangle(cornerRadius: 4)
-                    .stroke(checkedIngredients.contains(ingredient.id) ? coralColor : Color.gray.opacity(0.3), lineWidth: 1.5)
+                    .stroke(isIngredientChecked(ingredient) ? coralColor : Color.gray.opacity(0.3), lineWidth: 1.5)
                     .frame(width: 22, height: 22)
                     .overlay(
                         Group {
-                            if checkedIngredients.contains(ingredient.id) {
+                            if isIngredientChecked(ingredient) {
                                 Image(systemName: "checkmark")
                                     .font(.system(size: 12, weight: .bold))
                                     .foregroundColor(coralColor)
@@ -197,8 +223,8 @@ struct RecipeDetailView: View {
                 
                 Text(ingredient.displayText)
                     .font(.system(size: 16))
-                    .foregroundColor(checkedIngredients.contains(ingredient.id) ? .secondary : .primary)
-                    .strikethrough(checkedIngredients.contains(ingredient.id), color: .secondary)
+                    .foregroundColor(isIngredientChecked(ingredient) ? .secondary : .primary)
+                    .strikethrough(isIngredientChecked(ingredient), color: .secondary)
                 
                 Spacer()
             }
@@ -262,10 +288,41 @@ struct RecipeDetailView: View {
             }
         }
     }
+
+    private var isBookmarked: Bool {
+        savedRecipesStore.isSaved(recipeId: recipe.id)
+    }
+
+    private func isIngredientChecked(_ ingredient: Ingredient) -> Bool {
+        savedRecipesStore.isIngredientChecked(recipeId: recipe.id, key: ingredient.cacheKey)
+    }
+
+    private func handleSave() async {
+        guard !isBookmarkBusy else { return }
+        isBookmarkBusy = true
+        defer { isBookmarkBusy = false }
+        await savedRecipesStore.save(
+            recipe: recipe,
+            source: .recipe(id: recipe.id),
+            authManager: authManager
+        )
+    }
+
+    private func handleUnsaveAndDismiss() async {
+        guard !isBookmarkBusy else { return }
+        isBookmarkBusy = true
+        defer {
+            isBookmarkBusy = false
+            dismiss()
+        }
+        await savedRecipesStore.unsave(recipe: recipe, authManager: authManager)
+    }
 }
 
 #Preview {
     NavigationStack {
         RecipeDetailView(recipe: MockRecipeData.recipes[0])
     }
+    .environment(AuthenticationManager())
+    .environment(SavedRecipesStore.preview())
 }

@@ -1,7 +1,8 @@
 import SwiftUI
 
 struct SavedRecipesView: View {
-    let savedRecipes: [Recipe]
+    @Environment(AuthenticationManager.self) private var authManager
+    @Environment(SavedRecipesStore.self) private var savedRecipesStore
     
     private let coralColor = Color(red: 0.96, green: 0.58, blue: 0.53)
     private let softBackground = Color(red: 0.97, green: 0.97, blue: 0.99)
@@ -18,6 +19,12 @@ struct SavedRecipesView: View {
         }
         .background(softBackground)
         .navigationBarHidden(true)
+        .refreshable {
+            await savedRecipesStore.loadSavedRecipes(authManager: authManager, page: 1, limit: 20, force: true)
+        }
+        .task {
+            await savedRecipesStore.loadSavedRecipesIfNeeded(authManager: authManager)
+        }
     }
     
     private var headerCard: some View {
@@ -81,7 +88,7 @@ struct SavedRecipesView: View {
                     Text("Pantry Essentials")
                         .font(.system(size: 20, weight: .bold))
                         .foregroundColor(.black)
-                    Text("\(savedRecipes.count) recipes")
+                    Text("\(savedRecipesStore.savedRecipes.count) recipes")
                         .font(.system(size: 15, weight: .medium))
                         .foregroundColor(.black.opacity(0.4))
                 }
@@ -96,10 +103,36 @@ struct SavedRecipesView: View {
             }
             
             VStack(spacing: 16) {
-                ForEach(savedRecipes) { recipe in
-                    SavedRecipeRow(recipe: recipe)
+                if savedRecipesStore.isLoading && savedRecipesStore.savedRecipes.isEmpty {
+                    ProgressView()
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 24)
+                } else if savedRecipesStore.savedRecipes.isEmpty {
+                    emptyState
+                } else {
+                    LazyVStack(spacing: 16) {
+                        ForEach(savedRecipesStore.savedRecipes) { savedRecipe in
+                            NavigationLink(destination: RecipeDetailView(recipe: savedRecipe.recipe)) {
+                                SavedRecipeRow(recipe: savedRecipe.recipe)
+                            }
+                            .buttonStyle(.plain)
+                            .onAppear {
+                                if savedRecipe.id == savedRecipesStore.savedRecipes.last?.id {
+                                    Task {
+                                        await savedRecipesStore.loadMoreSavedRecipes(authManager: authManager)
+                                    }
+                                }
+                            }
+                        }
+
+                        if savedRecipesStore.isLoadingMore {
+                            ProgressView()
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 16)
+                        }
+                    }
                 }
-                
+
                 AddRecipeUpsellCard()
             }
         }
@@ -111,10 +144,24 @@ struct SavedRecipesView: View {
                 .shadow(color: Color.black.opacity(0.06), radius: 12, x: 0, y: 6)
         )
     }
+
+    private var emptyState: some View {
+        VStack(spacing: 8) {
+            Text("Nothing saved yet")
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundColor(.black.opacity(0.75))
+            Text("Bookmark recipes to find them here.")
+                .font(.system(size: 14, weight: .medium))
+                .foregroundColor(.black.opacity(0.45))
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 24)
+    }
 }
 
 private struct SavedRecipeRow: View {
     let recipe: Recipe
+    private let tagLimit = 2
     
     var body: some View {
         HStack(alignment: .center, spacing: 16) {
@@ -135,14 +182,24 @@ private struct SavedRecipeRow: View {
                 Text("Prep \(recipe.prepTime) • \(recipe.caloriesDisplay)")
                     .font(.system(size: 14, weight: .medium))
                     .foregroundColor(.black.opacity(0.45))
-                
-                Text(recipe.mealType.displayName)
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(recipe.mealType.accentColor)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 4)
-                    .background(recipe.mealType.accentColor.opacity(0.12))
-                    .clipShape(Capsule())
+
+                if recipe.tags.isEmpty {
+                    Text("No tags")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(.black.opacity(0.4))
+                } else {
+                    HStack(spacing: 6) {
+                        ForEach(recipe.tags.prefix(tagLimit), id: \.self) { tag in
+                            Text(tag.uppercased())
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundColor(.black.opacity(0.7))
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(Color.black.opacity(0.06))
+                                .clipShape(Capsule())
+                        }
+                    }
+                }
             }
             
             Spacer()
@@ -182,5 +239,7 @@ private struct AddRecipeUpsellCard: View {
 }
 
 #Preview {
-    SavedRecipesView(savedRecipes: MockRecipeData.recipes)
+    SavedRecipesView()
+        .environment(AuthenticationManager())
+        .environment(SavedRecipesStore.preview())
 }

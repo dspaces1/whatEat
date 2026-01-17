@@ -73,6 +73,14 @@ struct Ingredient: Identifiable {
         }
         return name
     }
+
+    var cacheKey: String {
+        let trimmed = displayText.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty {
+            return id.uuidString
+        }
+        return trimmed.lowercased()
+    }
 }
 
 struct InstructionStep: Identifiable {
@@ -98,11 +106,43 @@ struct Recipe: Identifiable {
     let imageURL: URL?
     let ingredients: [Ingredient]
     let instructions: [InstructionStep]
+    let tags: [String]
+    let sourceType: String?
+
+    init(
+        id: String,
+        name: String,
+        mealType: MealType,
+        prepTime: String,
+        calories: Int?,
+        imageURL: URL?,
+        ingredients: [Ingredient],
+        instructions: [InstructionStep],
+        tags: [String] = [],
+        sourceType: String? = nil
+    ) {
+        self.id = id
+        self.name = name
+        self.mealType = mealType
+        self.prepTime = prepTime
+        self.calories = calories
+        self.imageURL = imageURL
+        self.ingredients = ingredients
+        self.instructions = instructions
+        self.tags = tags
+        self.sourceType = sourceType
+    }
     
     var caloriesDisplay: String {
         if let calories {
             return "\(calories) kcal"
         }
         return "N/A kcal"
+    }
+
+    var isUserOwned: Bool {
+        guard let sourceType else { return false }
+        let normalized = sourceType.lowercased()
+        return normalized == "user" || normalized == "manual"
     }
 }

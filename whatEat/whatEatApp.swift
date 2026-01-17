@@ -9,7 +9,9 @@ import SwiftUI
 
 @main
 struct whatEatApp: App {
+    @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @State private var authManager = AuthenticationManager()
+    @State private var savedRecipesStore = SavedRecipesStore()
     @State private var showDebugMenu = false
     
     var body: some Scene {
@@ -26,6 +28,12 @@ struct whatEatApp: App {
             }
             .animation(.easeInOut, value: authManager.authState)
             .environment(authManager)
+            .environment(savedRecipesStore)
+            .onChange(of: authManager.authState) { _, newState in
+                if newState == .signedOut {
+                    savedRecipesStore.reset()
+                }
+            }
 #if DEBUG
             .background(ShakeDetectorView {
                 showDebugMenu = true

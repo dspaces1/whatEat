@@ -37,7 +37,9 @@ struct RecipeMapper {
             calories: recipe.calories,
             imageURL: imageURL,
             ingredients: ingredients,
-            instructions: instructions
+            instructions: instructions,
+            tags: recipe.tags ?? [],
+            sourceType: recipe.sourceType
         )
     }
 
