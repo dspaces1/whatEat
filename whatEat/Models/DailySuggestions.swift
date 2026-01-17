@@ -1,8 +1,24 @@
 import Foundation
 
 struct DailySuggestionsResponse: Decodable {
-    let suggestions: [DailySuggestion]
+    let suggestions: DailySuggestionsPayload
     let run: DailyRun?
+}
+
+enum DailySuggestionsPayload: Decodable {
+    case list([DailySuggestion])
+    case buckets([String: [DailySuggestion]])
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        if let buckets = try? container.decode([String: [DailySuggestion]].self) {
+            self = .buckets(buckets)
+        } else if let list = try? container.decode([DailySuggestion].self) {
+            self = .list(list)
+        } else {
+            self = .buckets([:])
+        }
+    }
 }
 
 struct DailySuggestion: Decodable, Identifiable {
@@ -73,6 +89,7 @@ struct RecipeIngredient: Decodable {
     let amount: String?
     let unit: String?
     let quantity: String?
+    let rawText: String?
     let text: String?
 
     init(from decoder: Decoder) throws {
@@ -82,6 +99,7 @@ struct RecipeIngredient: Decodable {
             amount = nil
             unit = nil
             quantity = nil
+            rawText = textValue
             text = textValue
             return
         }
@@ -91,7 +109,8 @@ struct RecipeIngredient: Decodable {
         amount = RecipeIngredient.decodeFlexibleString(from: container, forKey: .amount)
         unit = try container.decodeIfPresent(String.self, forKey: .unit)
         quantity = RecipeIngredient.decodeFlexibleString(from: container, forKey: .quantity)
-        text = try container.decodeIfPresent(String.self, forKey: .text)
+        rawText = try container.decodeIfPresent(String.self, forKey: .rawText)
+        text = try container.decodeIfPresent(String.self, forKey: .text) ?? rawText
     }
 
     private static func decodeFlexibleString(
@@ -115,6 +134,7 @@ struct RecipeIngredient: Decodable {
         case amount
         case unit
         case quantity
+        case rawText
         case text
     }
 }
@@ -123,6 +143,7 @@ struct RecipeStep: Decodable {
     let title: String?
     let detail: String?
     let text: String?
+    let instruction: String?
     let order: Int?
 
     init(from decoder: Decoder) throws {
@@ -131,6 +152,7 @@ struct RecipeStep: Decodable {
             title = nil
             detail = nil
             text = textValue
+            instruction = nil
             order = nil
             return
         }
@@ -138,7 +160,8 @@ struct RecipeStep: Decodable {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         title = try container.decodeIfPresent(String.self, forKey: .title)
         detail = try container.decodeIfPresent(String.self, forKey: .detail)
-        text = try container.decodeIfPresent(String.self, forKey: .text)
+        instruction = try container.decodeIfPresent(String.self, forKey: .instruction)
+        text = try container.decodeIfPresent(String.self, forKey: .text) ?? instruction
         if let orderValue = try container.decodeIfPresent(Int.self, forKey: .order) {
             order = orderValue
         } else {
@@ -150,6 +173,7 @@ struct RecipeStep: Decodable {
         case title
         case detail = "description"
         case text
+        case instruction
         case order
         case stepNumber
     }
