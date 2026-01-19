@@ -62,6 +62,12 @@ struct RecipeData: Decodable {
     let steps: [RecipeStep]?
     let media: [RecipeMedia]?
     let metadata: RecipeMetadata?
+    let ownership: RecipeOwnership?
+    let editableRecipeId: String?
+}
+
+struct RecipeOwnership: Decodable {
+    let isUserOwned: Bool
 }
 
 struct RecipeMedia: Decodable {

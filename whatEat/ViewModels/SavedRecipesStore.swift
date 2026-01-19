@@ -142,7 +142,11 @@ final class SavedRecipesStore {
                 accessToken: accessToken
             )
             let resolvedRecipeId = response.recipeId ?? response.sourceRecipeId ?? recipe.id
-            let savedRecipe = makeSavedRecipe(from: recipe, savedRecipeId: resolvedRecipeId)
+            let savedRecipe = makeSavedRecipe(
+                from: recipe,
+                savedRecipeId: resolvedRecipeId,
+                sourceTypeOverride: "user"
+            )
             let item = SavedRecipeItem(
                 id: response.id,
                 savedAt: response.createdAt,
@@ -161,6 +165,72 @@ final class SavedRecipesStore {
             }
             errorMessage = error.localizedDescription
         }
+    }
+
+    func ensureEditableRecipeId(
+        for recipe: Recipe,
+        authManager: AuthenticationManager
+    ) async throws -> String {
+        if recipe.isUserOwned {
+            return recipe.id
+        }
+
+        if let editableRecipeId = recipe.editableRecipeId, !editableRecipeId.isEmpty {
+            return editableRecipeId
+        }
+
+        if let existing = savedRecipes.first(where: { $0.sourceRecipeId == recipe.id }) {
+            return existing.recipe.id
+        }
+
+        let accessToken = try await authManager.getValidAccessToken()
+        let response: SaveRecipeResponse = try await APIService.shared.postAuthenticated(
+            path: "/recipe-saves",
+            body: SaveSource.recipe(id: recipe.id).request,
+            accessToken: accessToken
+        )
+        let resolvedRecipeId = response.recipeId ?? response.sourceRecipeId ?? recipe.id
+        let savedRecipe = makeSavedRecipe(
+            from: recipe,
+            savedRecipeId: resolvedRecipeId,
+            sourceTypeOverride: "user"
+        )
+        let item = SavedRecipeItem(
+            id: response.id,
+            savedAt: response.createdAt,
+            sourceRecipeId: response.sourceRecipeId ?? recipe.id,
+            dailyPlanItemId: response.dailyPlanItemId,
+            recipe: savedRecipe
+        )
+        upsertSavedRecipe(item, insertAtTop: true)
+        return resolvedRecipeId
+    }
+
+    func updateRecipe(_ recipe: Recipe, sourceRecipeId: String? = nil) {
+        if let index = savedRecipes.firstIndex(where: { $0.recipe.id == recipe.id }) {
+            savedRecipes[index].recipe = recipe
+            rebuildIndex()
+            return
+        }
+        if let sourceRecipeId,
+           let index = savedRecipes.firstIndex(where: { $0.sourceRecipeId == sourceRecipeId }) {
+            let item = savedRecipes[index]
+            savedRecipes[index] = SavedRecipeItem(
+                id: item.id,
+                savedAt: item.savedAt,
+                sourceRecipeId: item.sourceRecipeId,
+                dailyPlanItemId: item.dailyPlanItemId,
+                recipe: recipe
+            )
+            rebuildIndex()
+        }
+    }
+
+    func refreshAfterRecipeMutation(
+        recipe: Recipe,
+        authManager: AuthenticationManager
+    ) async {
+        await loadSavedRecipes(authManager: authManager, page: 1, limit: pageLimit, force: true)
     }
 
     func loadMoreSavedRecipes(authManager: AuthenticationManager) async {
@@ -271,7 +341,11 @@ final class SavedRecipesStore {
         rebuildIndex()
     }
 
-    private func makeSavedRecipe(from recipe: Recipe, savedRecipeId: String) -> Recipe {
+    private func makeSavedRecipe(
+        from recipe: Recipe,
+        savedRecipeId: String,
+        sourceTypeOverride: String? = nil
+    ) -> Recipe {
         Recipe(
             id: savedRecipeId,
             name: recipe.name,
@@ -282,7 +356,9 @@ final class SavedRecipesStore {
             ingredients: recipe.ingredients,
             instructions: recipe.instructions,
             tags: recipe.tags,
-            sourceType: recipe.sourceType
+            sourceType: sourceTypeOverride ?? recipe.sourceType,
+            ownership: RecipeOwnership(isUserOwned: true),
+            editableRecipeId: savedRecipeId
         )
     }
 }

@@ -3,6 +3,7 @@ import SwiftUI
 struct SavedRecipesView: View {
     @Environment(AuthenticationManager.self) private var authManager
     @Environment(SavedRecipesStore.self) private var savedRecipesStore
+    @State private var showCreateRecipe = false
     
     private let coralColor = Color(red: 0.96, green: 0.58, blue: 0.53)
     private let softBackground = Color(red: 0.97, green: 0.97, blue: 0.99)
@@ -19,6 +20,9 @@ struct SavedRecipesView: View {
         }
         .background(softBackground)
         .navigationBarHidden(true)
+        .navigationDestination(isPresented: $showCreateRecipe) {
+            RecipeEditorView(mode: .create)
+        }
         .refreshable {
             await savedRecipesStore.loadSavedRecipes(authManager: authManager, page: 1, limit: 20, force: true)
         }
@@ -119,7 +123,9 @@ struct SavedRecipesView: View {
     private var savedListContent: some View {
         VStack(spacing: 16) {
             savedRecipesContent
-            AddRecipeUpsellCard()
+            AddRecipeUpsellCard {
+                showCreateRecipe = true
+            }
         }
     }
 
@@ -228,8 +234,10 @@ private struct SavedRecipeRow: View {
 }
 
 private struct AddRecipeUpsellCard: View {
+    let onTap: () -> Void
+
     var body: some View {
-        Button(action: {}) {
+        Button(action: onTap) {
             HStack(spacing: 12) {
                 Image(systemName: "plus")
                     .font(.system(size: 20, weight: .bold))

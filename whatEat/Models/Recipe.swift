@@ -108,6 +108,8 @@ struct Recipe: Identifiable {
     let instructions: [InstructionStep]
     let tags: [String]
     let sourceType: String?
+    let ownership: RecipeOwnership?
+    let editableRecipeId: String?
 
     init(
         id: String,
@@ -119,7 +121,9 @@ struct Recipe: Identifiable {
         ingredients: [Ingredient],
         instructions: [InstructionStep],
         tags: [String] = [],
-        sourceType: String? = nil
+        sourceType: String? = nil,
+        ownership: RecipeOwnership? = nil,
+        editableRecipeId: String? = nil
     ) {
         self.id = id
         self.name = name
@@ -131,6 +135,8 @@ struct Recipe: Identifiable {
         self.instructions = instructions
         self.tags = tags
         self.sourceType = sourceType
+        self.ownership = ownership
+        self.editableRecipeId = editableRecipeId
     }
     
     var caloriesDisplay: String {
@@ -141,6 +147,9 @@ struct Recipe: Identifiable {
     }
 
     var isUserOwned: Bool {
+        if let ownership {
+            return ownership.isUserOwned
+        }
         guard let sourceType else { return false }
         let normalized = sourceType.lowercased()
         return normalized == "user" || normalized == "manual"

@@ -39,7 +39,9 @@ struct RecipeMapper {
             ingredients: ingredients,
             instructions: instructions,
             tags: recipe.tags ?? [],
-            sourceType: recipe.sourceType
+            sourceType: recipe.sourceType,
+            ownership: recipe.ownership,
+            editableRecipeId: recipe.editableRecipeId
         )
     }
 

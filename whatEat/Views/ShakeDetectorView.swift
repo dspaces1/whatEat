@@ -13,8 +13,13 @@ struct ShakeDetectorView: UIViewControllerRepresentable {
     }
 }
 
+extension Notification.Name {
+    static let shakeDetectorRestore = Notification.Name("shakeDetectorRestore")
+}
+
 final class ShakeDetectorViewController: UIViewController {
     var onShake: () -> Void
+    private var observers: [NSObjectProtocol] = []
 
     init(onShake: @escaping () -> Void) {
         self.onShake = onShake
@@ -34,11 +39,33 @@ final class ShakeDetectorViewController: UIViewController {
         super.viewDidLoad()
         view.isUserInteractionEnabled = false
         view.backgroundColor = .clear
+        let center = NotificationCenter.default
+        observers.append(center.addObserver(
+            forName: UIResponder.keyboardDidHideNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.restoreFirstResponder()
+        })
+        observers.append(center.addObserver(
+            forName: .shakeDetectorRestore,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.restoreFirstResponder()
+        })
+        observers.append(center.addObserver(
+            forName: UIApplication.didBecomeActiveNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.restoreFirstResponder()
+        })
     }
 
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
-        becomeFirstResponder()
+        restoreFirstResponder()
     }
 
     override func viewWillDisappear(_ animated: Bool) {
@@ -46,8 +73,18 @@ final class ShakeDetectorViewController: UIViewController {
         resignFirstResponder()
     }
 
+    deinit {
+        let center = NotificationCenter.default
+        observers.forEach { center.removeObserver($0) }
+    }
+
     override func motionEnded(_ motion: UIEvent.EventSubtype, with event: UIEvent?) {
         guard motion == .motionShake else { return }
         onShake()
+    }
+
+    private func restoreFirstResponder() {
+        guard isViewLoaded, view.window != nil else { return }
+        becomeFirstResponder()
     }
 }

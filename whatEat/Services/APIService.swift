@@ -100,6 +100,25 @@ actor APIService {
         return try await performRequest(request)
     }
 
+    /// Performs an authenticated PATCH request with JSON body.
+    func patchAuthenticated<T: Decodable, U: Encodable>(
+        path: String,
+        body: U,
+        accessToken: String
+    ) async throws -> T {
+        guard let url = makeURL(path: path) else {
+            throw APIError.invalidURL
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "PATCH"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+        request.httpBody = try encoder.encode(body)
+
+        return try await performRequest(request)
+    }
+
     /// Performs a GET request and returns decoded response.
     func get<T: Decodable>(
         path: String,

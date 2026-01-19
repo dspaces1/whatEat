@@ -10,11 +10,74 @@ struct RecipeDetailView: View {
     
     @State private var showUnsaveConfirmation = false
     @State private var isBookmarkBusy = false
+    @State private var isPreparingEdit = false
+    @State private var editErrorMessage: String?
+    @State private var editorRecipe: Recipe?
+    @State private var showEditor = false
+    @State private var currentRecipe: Recipe
     
     private let coralColor = Color(red: 0.96, green: 0.58, blue: 0.53)
     private let softGreen = Color(red: 0.56, green: 0.82, blue: 0.67)
+
+    init(recipe: Recipe, showsEditButton: Bool) {
+        self.recipe = recipe
+        self.showsEditButton = showsEditButton
+        _currentRecipe = State(initialValue: recipe)
+    }
     
     var body: some View {
+        let base = AnyView(
+            content
+                .background(Color(.systemBackground))
+                .navigationTitle(currentRecipe.name)
+                .navigationBarTitleDisplayMode(.inline)
+        )
+
+        let withToolbar = AnyView(
+            base.toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    toolbarButtons
+                }
+            }
+        )
+
+        let withAlerts = AnyView(
+            withToolbar
+                .alert("Remove bookmark?", isPresented: $showUnsaveConfirmation) {
+                    Button("Remove", role: .destructive) {
+                        Task {
+                            await handleUnsaveAndDismiss()
+                        }
+                    }
+                    Button("Cancel", role: .cancel) { }
+                } message: {
+                    Text("Are you sure you want to remove this recipe from saved?")
+                }
+                .navigationDestination(isPresented: $showEditor) {
+                    if let recipe = editorRecipe {
+                        RecipeEditorView(mode: .edit(recipe: recipe))
+                    }
+                }
+                .alert("Unable to edit", isPresented: editAlertBinding) {
+                    Button("OK", role: .cancel) {
+                        editErrorMessage = nil
+                    }
+                } message: {
+                    Text(editErrorMessage ?? "Something went wrong.")
+                }
+        )
+
+        return AnyView(
+            withAlerts.onChange(of: showEditor) { _, newValue in
+                if !newValue {
+                    editorRecipe = nil
+                    refreshCurrentRecipe()
+                }
+            }
+        )
+    }
+
+    private var content: some View {
         ScrollView {
             VStack(spacing: 0) {
                 // Hero Image with overlapping stats card
@@ -24,7 +87,7 @@ struct RecipeDetailView: View {
                         .offset(y: 40)
                 }
                 .padding(.bottom, 40)
-                
+
                 // Content
                 VStack(alignment: .leading, spacing: 24) {
                     recipeTitle
@@ -36,56 +99,67 @@ struct RecipeDetailView: View {
                 .padding(.bottom, 40)
             }
         }
-        .background(Color(.systemBackground))
-        .navigationTitle(recipe.name)
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                HStack(spacing: 16) {
-                    if showsEditButton {
-                        Button {
-                            // TODO: Hook up edit flow.
-                        } label: {
-                            Image(systemName: "pencil")
-                                .font(.system(size: 18, weight: .semibold))
-                                .foregroundColor(.primary)
-                        }
-                    }
+    }
 
-                    Button {
-                        guard !isBookmarkBusy else { return }
-                        if isBookmarked {
-                            showUnsaveConfirmation = true
-                        } else {
-                            Task {
-                                await handleSave()
-                            }
-                        }
-                    } label: {
-                        ZStack {
-                            if isBookmarkBusy {
-                                ProgressView()
-                                    .tint(coralColor)
-                            } else {
-                                Image(systemName: isBookmarked ? "bookmark.fill" : "bookmark")
-                                    .font(.system(size: 16, weight: .medium))
-                                    .foregroundColor(isBookmarked ? coralColor : .primary)
-                            }
-                        }
+    private var toolbarButtons: some View {
+        HStack(spacing: 16) {
+            if showsEditButton {
+                Button {
+                    beginEdit()
+                } label: {
+                    if isPreparingEdit {
+                        ProgressView()
+                            .tint(coralColor)
+                    } else {
+                        Image(systemName: "pencil")
+                            .font(.system(size: 18, weight: .semibold))
+                            .foregroundColor(.primary)
                     }
-                    .disabled(isBookmarkBusy)
+                }
+                .disabled(isPreparingEdit)
+            }
+
+            Button {
+                guard !isBookmarkBusy else { return }
+                if isBookmarked {
+                    showUnsaveConfirmation = true
+                } else {
+                    Task {
+                        await handleSave()
+                    }
+                }
+            } label: {
+                ZStack {
+                    if isBookmarkBusy {
+                        ProgressView()
+                            .tint(coralColor)
+                    } else {
+                        Image(systemName: isBookmarked ? "bookmark.fill" : "bookmark")
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundColor(isBookmarked ? coralColor : .primary)
+                    }
                 }
             }
+            .disabled(isBookmarkBusy)
         }
-        .alert("Remove bookmark?", isPresented: $showUnsaveConfirmation) {
-            Button("Remove", role: .destructive) {
-                Task {
-                    await handleUnsaveAndDismiss()
+    }
+
+    private var editAlertBinding: Binding<Bool> {
+        Binding(
+            get: { editErrorMessage != nil },
+            set: { isPresented in
+                if !isPresented {
+                    editErrorMessage = nil
                 }
             }
-            Button("Cancel", role: .cancel) { }
-        } message: {
-            Text("Are you sure you want to remove this recipe from saved?")
+        )
+    }
+
+    private func refreshCurrentRecipe() {
+        if let updated = savedRecipesStore.savedRecipes.first(where: { $0.recipe.id == currentRecipe.id })?.recipe {
+            currentRecipe = updated
+        } else if let updated = savedRecipesStore.savedRecipes.first(where: { $0.sourceRecipeId == currentRecipe.id })?.recipe {
+            currentRecipe = updated
         }
     }
     
@@ -94,10 +168,10 @@ struct RecipeDetailView: View {
     private var heroImage: some View {
         ZStack {
             RemoteImageView(
-                url: recipe.imageURL,
+                url: currentRecipe.imageURL,
                 contentMode: .fill,
                 showsPlaceholderIcon: true,
-                placeholderBackground: recipe.mealType.accentColor.opacity(0.2),
+                placeholderBackground: currentRecipe.mealType.accentColor.opacity(0.2),
                 placeholderIconFont: .system(size: 48)
             )
             .frame(height: 280)
@@ -129,7 +203,7 @@ struct RecipeDetailView: View {
                     .tracking(0.5)
                     .foregroundColor(.secondary)
                 
-                Text(recipe.prepTime)
+                Text(currentRecipe.prepTime)
                     .font(.system(size: 17, weight: .bold))
                     .foregroundColor(.primary)
             }
@@ -151,7 +225,7 @@ struct RecipeDetailView: View {
                     .tracking(0.5)
                     .foregroundColor(.secondary)
                 
-                Text(recipe.caloriesDisplay)
+                Text(currentRecipe.caloriesDisplay)
                     .font(.system(size: 17, weight: .bold))
                     .foregroundColor(.primary)
             }
@@ -170,7 +244,7 @@ struct RecipeDetailView: View {
     // MARK: - Title
 
     private var recipeTitle: some View {
-        Text(recipe.name)
+        Text(currentRecipe.name)
             .font(.system(size: 24, weight: .bold))
             .foregroundColor(.primary)
             .lineLimit(3)
@@ -197,7 +271,7 @@ struct RecipeDetailView: View {
                 
                 Button {
                     withAnimation(.easeInOut(duration: 0.2)) {
-                        savedRecipesStore.resetIngredientChecks(recipeId: recipe.id)
+                        savedRecipesStore.resetIngredientChecks(recipeId: currentRecipe.id)
                     }
                 } label: {
                     Text("Reset")
@@ -207,13 +281,13 @@ struct RecipeDetailView: View {
             }
             
             // Ingredient list
-            if recipe.ingredients.isEmpty {
+            if currentRecipe.ingredients.isEmpty {
                 Text("Ingredients will appear here once available.")
                     .font(.system(size: 15))
                     .foregroundColor(.secondary)
             } else {
                 VStack(spacing: 14) {
-                    ForEach(recipe.ingredients) { ingredient in
+                    ForEach(currentRecipe.ingredients) { ingredient in
                         ingredientRow(ingredient)
                     }
                 }
@@ -225,7 +299,7 @@ struct RecipeDetailView: View {
         Button {
             withAnimation(.easeInOut(duration: 0.15)) {
                 savedRecipesStore.toggleIngredientCheck(
-                    recipeId: recipe.id,
+                    recipeId: currentRecipe.id,
                     key: ingredient.cacheKey
                 )
             }
@@ -272,13 +346,13 @@ struct RecipeDetailView: View {
             }
             
             // Steps
-            if recipe.instructions.isEmpty {
+            if currentRecipe.instructions.isEmpty {
                 Text("Instructions will appear here once available.")
                     .font(.system(size: 15))
                     .foregroundColor(.secondary)
             } else {
                 VStack(spacing: 24) {
-                    ForEach(recipe.instructions) { step in
+                    ForEach(currentRecipe.instructions) { step in
                         instructionRow(step)
                     }
                 }
@@ -314,11 +388,11 @@ struct RecipeDetailView: View {
     }
 
     private var isBookmarked: Bool {
-        savedRecipesStore.isSaved(recipeId: recipe.id)
+        savedRecipesStore.isSaved(recipeId: currentRecipe.id)
     }
 
     private func isIngredientChecked(_ ingredient: Ingredient) -> Bool {
-        savedRecipesStore.isIngredientChecked(recipeId: recipe.id, key: ingredient.cacheKey)
+        savedRecipesStore.isIngredientChecked(recipeId: currentRecipe.id, key: ingredient.cacheKey)
     }
 
     private func handleSave() async {
@@ -326,8 +400,8 @@ struct RecipeDetailView: View {
         isBookmarkBusy = true
         defer { isBookmarkBusy = false }
         await savedRecipesStore.save(
-            recipe: recipe,
-            source: .recipe(id: recipe.id),
+            recipe: currentRecipe,
+            source: .recipe(id: currentRecipe.id),
             authManager: authManager
         )
     }
@@ -339,7 +413,14 @@ struct RecipeDetailView: View {
             isBookmarkBusy = false
             dismiss()
         }
-        await savedRecipesStore.unsave(recipe: recipe, authManager: authManager)
+        await savedRecipesStore.unsave(recipe: currentRecipe, authManager: authManager)
+    }
+
+    private func beginEdit() {
+        guard !isPreparingEdit else { return }
+        editErrorMessage = nil
+        editorRecipe = currentRecipe
+        showEditor = true
     }
 }
 
